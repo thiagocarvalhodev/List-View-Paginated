@@ -18,12 +18,16 @@ class ListViewPaginated<T> extends StatefulWidget {
   final int pageSize;
   final Key key;
   final Widget loadingIndicator;
+  final bool isSeparated;
+  final Widget separatorWidget;
 
   ListViewPaginated(
       {@required this.loadMore,
       @required this.itemBuilder,
       this.loadingIndicator,
       this.pageSize = 10,
+      this.isSeparated = false,
+      this.separatorWidget,
       this.key})
       : super(key: key);
 
@@ -150,6 +154,33 @@ class _ListViewPaginatedState<T> extends State<ListViewPaginated<T>> {
     );
   }
 
+  Widget _buildListViewSeparated(List<T> items) {
+    return StreamBuilder<bool>(
+      initialData: false,
+      stream: _loadingController.stream,
+      builder: (context, snapshot) {
+        bool isLoading = snapshot.data;
+
+        return ScrollConfiguration(
+          behavior: MyBehavior(),
+          child: ListView.separated(
+              separatorBuilder: (context, index) => _defaultSeparator(),
+              shrinkWrap: true,
+              itemCount: isLoading ? items.length + 1 : items.length,
+              itemBuilder: (context, index) {
+                if (index == items.length)
+                  return widget.loadingIndicator ?? _defaultLoadingIndicator();
+                return widget.itemBuilder(items[index]);
+              }),
+        );
+      },
+    );
+  }
+
+  Widget _defaultSeparator() {
+    return Divider();
+  }
+
   Widget _defaultLoadingIndicator() {
     return Center(
       child: CircularProgressIndicator(),
@@ -164,7 +195,9 @@ class _ListViewPaginatedState<T> extends State<ListViewPaginated<T>> {
         initialData: _items,
         stream: _itemsController.stream,
         builder: (context, snapshot) {
-          return _buildListView(snapshot.data);
+          return widget.isSeparated
+              ? _buildListViewSeparated(snapshot.data)
+              : _buildListView(snapshot.data);
         },
       ),
     );
