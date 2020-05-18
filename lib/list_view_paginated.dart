@@ -1,7 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:list_view_paginated/scroll_helper.dart';
 import 'package:rxdart/rxdart.dart';
+
+// TODO: Handle case of the initial list don't fill the entire screen.
 
 /// `T` is model object type.
 /// `LoadMore` returns a list of new objects passing the current page `page`
@@ -12,10 +15,14 @@ typedef ItemBuilder<T> = Widget Function(T model);
 class ListViewPaginated<T> extends StatefulWidget {
   final LoadMore<T> loadMore;
   final ItemBuilder<T> itemBuilder;
+  final int pageSize;
   final Key key;
 
   ListViewPaginated(
-      {@required this.loadMore, @required this.itemBuilder, this.key})
+      {@required this.loadMore,
+      @required this.itemBuilder,
+      this.pageSize = 10,
+      this.key})
       : super(key: key);
 
   @override
@@ -26,6 +33,7 @@ class _ListViewPaginatedState<T> extends State<ListViewPaginated<T>> {
   @override
   void initState() {
     super.initState();
+    _pageSize = widget.pageSize;
     initStream();
     initList();
   }
@@ -53,6 +61,10 @@ class _ListViewPaginatedState<T> extends State<ListViewPaginated<T>> {
 
   bool _loading = false;
 
+  bool _hasItemsToLoad = true;
+
+  int _pageSize;
+
   List<T> _items = [];
 
   /// current page, for default, inits with one.
@@ -64,11 +76,18 @@ class _ListViewPaginatedState<T> extends State<ListViewPaginated<T>> {
       _startLoading();
       if (notification.metrics.pixels == notification.metrics.maxScrollExtent) {
         try {
-          List<T> moreItems = await widget.loadMore.call(_currentPage++);
+          if (_hasItemsToLoad) {
+            List<T> moreItems = await widget.loadMore.call(_currentPage++);
 
-          _items.addAll(moreItems);
+            // If the result is less than the page size, means that is the last page and don't have
+            // any item to load.
+            if (moreItems.length < _pageSize) _hasItemsToLoad = false;
 
-          _itemsController.sink.add(_items);
+            _items.addAll(moreItems);
+
+            _itemsController.sink.add(_items);
+          }
+
           _finishLoading();
         } catch (e) {
           _finishLoading();
@@ -116,16 +135,19 @@ class _ListViewPaginatedState<T> extends State<ListViewPaginated<T>> {
       builder: (context, snapshot) {
         bool isLoading = snapshot.data;
 
-        return ListView.builder(
-            shrinkWrap: true,
-            itemCount: isLoading ? items.length + 1 : items.length,
-            itemBuilder: (context, index) {
-              if (index >= items.length)
-                return Center(
-                  child: CircularProgressIndicator(),
-                );
-              return widget.itemBuilder(items[index]);
-            });
+        return ScrollConfiguration(
+          behavior: MyBehavior(),
+          child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: isLoading ? items.length + 1 : items.length,
+              itemBuilder: (context, index) {
+                if (index >= items.length)
+                  return Center(
+                    child: CircularProgressIndicator(),
+                  );
+                return widget.itemBuilder(items[index]);
+              }),
+        );
       },
     );
   }
