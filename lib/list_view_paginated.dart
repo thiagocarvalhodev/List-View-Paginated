@@ -12,8 +12,11 @@ typedef ItemBuilder<T> = Widget Function(T model);
 class ListViewPaginated<T> extends StatefulWidget {
   final LoadMore<T> loadMore;
   final ItemBuilder<T> itemBuilder;
+  final Key key;
 
-  ListViewPaginated({@required this.loadMore, @required this.itemBuilder});
+  ListViewPaginated(
+      {@required this.loadMore, @required this.itemBuilder, this.key})
+      : super(key: key);
 
   @override
   _ListViewPaginatedState<T> createState() => _ListViewPaginatedState<T>();
