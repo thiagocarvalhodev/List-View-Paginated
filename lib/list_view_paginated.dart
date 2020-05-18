@@ -5,7 +5,7 @@ import 'package:list_view_paginated/scroll_helper.dart';
 import 'package:rxdart/rxdart.dart';
 
 // TODO: Handle case of the initial list don't fill the entire screen.
-
+// TODO: Add options to ListView
 /// `T` is model object type.
 /// `LoadMore` returns a list of new objects passing the current page `page`
 typedef LoadMore<T> = Future<List<T>> Function(int page);
@@ -17,10 +17,12 @@ class ListViewPaginated<T> extends StatefulWidget {
   final ItemBuilder<T> itemBuilder;
   final int pageSize;
   final Key key;
+  final Widget loadingIndicator;
 
   ListViewPaginated(
       {@required this.loadMore,
       @required this.itemBuilder,
+      this.loadingIndicator,
       this.pageSize = 10,
       this.key})
       : super(key: key);
@@ -72,21 +74,19 @@ class _ListViewPaginatedState<T> extends State<ListViewPaginated<T>> {
 
   // Call new elements and increment the page.
   _loadMore(ScrollNotification notification) async {
-    if (!_loading) {
+    if (!_loading && _hasItemsToLoad) {
       _startLoading();
       if (notification.metrics.pixels == notification.metrics.maxScrollExtent) {
         try {
-          if (_hasItemsToLoad) {
-            List<T> moreItems = await widget.loadMore.call(_currentPage++);
+          List<T> moreItems = await widget.loadMore.call(_currentPage++);
 
-            // If the result is less than the page size, means that is the last page and don't have
-            // any item to load.
-            if (moreItems.length < _pageSize) _hasItemsToLoad = false;
+          // If the result is less than the page size, means that is the last page and don't have
+          // any item to load.
+          if (moreItems.length < _pageSize) _hasItemsToLoad = false;
 
-            _items.addAll(moreItems);
+          _items.addAll(moreItems);
 
-            _itemsController.sink.add(_items);
-          }
+          _itemsController.sink.add(_items);
 
           _finishLoading();
         } catch (e) {
@@ -141,14 +141,18 @@ class _ListViewPaginatedState<T> extends State<ListViewPaginated<T>> {
               shrinkWrap: true,
               itemCount: isLoading ? items.length + 1 : items.length,
               itemBuilder: (context, index) {
-                if (index >= items.length)
-                  return Center(
-                    child: CircularProgressIndicator(),
-                  );
+                if (index == items.length)
+                  return widget.loadingIndicator ?? _defaultLoadingIndicator();
                 return widget.itemBuilder(items[index]);
               }),
         );
       },
+    );
+  }
+
+  Widget _defaultLoadingIndicator() {
+    return Center(
+      child: CircularProgressIndicator(),
     );
   }
 
